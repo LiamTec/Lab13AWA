@@ -1,0 +1,26 @@
+[
+  {
+    "id": "1763261177030",
+    "name": "Liam",
+    "email": "liam@gmail.com",
+    "passwordHash": "$2a$10$vJbn/nNFemslwsFVGX1cOeG8agrhrRghe4rJZOgPg02wGgS5GQMRa",
+    "failedAttempts": 6,
+    "lockUntil": 1763263276484
+  },
+  {
+    "id": "1763261960949",
+    "name": "liams",
+    "email": "liam.g@gmail.com",
+    "passwordHash": "$2a$10$dy/ZUqJkW6QaNAVqSY82.ub3ZeD/OvA0jDSL2pCFPOPi3C1oLHLKa",
+    "failedAttempts": 0,
+    "lockUntil": null
+  },
+  {
+    "id": "1763262403018",
+    "name": "jose",
+    "email": "jose@gmail.com",
+    "passwordHash": "$2a$10$W4mlyWsDQYki3gu9BQolVucPmnhNwMnS88kcDsn6b38P/VNIZnc9i",
+    "failedAttempts": 0,
+    "lockUntil": null
+  }
+]
