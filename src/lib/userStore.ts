@@ -1,8 +1,46 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import bcrypt from 'bcryptjs';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const BUNDLE_DATA_DIR = path.join(process.cwd(), 'data');
+const TMP_BASE = path.join(os.tmpdir(), 'next-auth-app-data');
+
+// Select a writable data directory. In serverless (Vercel) the project bundle
+// is read-only, so prefer a writable tmp dir when the bundle path is not writable.
+function chooseDataDir() {
+  try {
+    // if bundle data directory exists or can be created and is writable, use it
+    if (!fs.existsSync(BUNDLE_DATA_DIR)) {
+      try {
+        fs.mkdirSync(BUNDLE_DATA_DIR, { recursive: true });
+      } catch (e) {
+        // ignore, we'll try tmp
+      }
+    }
+    const testFile = path.join(BUNDLE_DATA_DIR, `.writable_test_${Date.now()}`);
+    try {
+      fs.writeFileSync(testFile, 'x');
+      fs.unlinkSync(testFile);
+      return BUNDLE_DATA_DIR;
+    } catch (err) {
+      // bundle dir is not writable (common on Vercel). fallthrough to tmp
+    }
+  } catch (e) {
+    // ignore and use tmp
+  }
+
+  // Ensure tmp base exists
+  try {
+    if (!fs.existsSync(TMP_BASE)) fs.mkdirSync(TMP_BASE, { recursive: true });
+    return TMP_BASE;
+  } catch (err) {
+    // As a last resort, return the bundle path (will likely error when writing)
+    return BUNDLE_DATA_DIR;
+  }
+}
+
+const DATA_DIR = chooseDataDir();
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 
 type User = {
@@ -15,7 +53,7 @@ type User = {
 };
 
 function ensureDataFile() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, JSON.stringify([]));
 }
 
@@ -31,7 +69,24 @@ function readUsers(): User[] {
 
 function writeUsers(users: User[]) {
   ensureDataFile();
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+  } catch (err) {
+    // If writing to the chosen data dir fails (e.g. read-only bundle),
+    // try using the OS tmp dir as fallback. This is a pragmatic workaround
+    // for serverless environments but is ephemeral — migrate to a DB for
+    // production use.
+    const fallbackDir = path.join(os.tmpdir(), 'next-auth-app-data');
+    try {
+      if (!fs.existsSync(fallbackDir)) fs.mkdirSync(fallbackDir, { recursive: true });
+      const fallbackFile = path.join(fallbackDir, 'users.json');
+      fs.writeFileSync(fallbackFile, JSON.stringify(users, null, 2));
+      console.warn('[userStore] wrote users to tmp fallback:', fallbackFile);
+    } catch (err2) {
+      console.error('[userStore] failed to write users file:', err2);
+      throw err2;
+    }
+  }
 }
 
 export async function createUser({ name, email, password }: { name: string; email: string; password: string }) {
